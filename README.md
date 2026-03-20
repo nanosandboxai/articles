@@ -1,6 +1,8 @@
-# Articles about nanosandboxing
+# Nanosandbox Articles
 
 Technical articles exploring sandboxing, isolation, and secure execution environments for AI coding agents.
+
+All content uses YAML frontmatter with `type: article` or `type: coming-soon` for categorization.
 
 ## Articles
 
@@ -8,4 +10,4 @@ Technical articles exploring sandboxing, isolation, and secure execution environ
 
 ## Coming Soon
 
-- [What's Coming Next](soon/whats-coming-next.md) — Windows support with crosvm and what's on the roadmap for Nanosandbox.
+- [What's Coming Next](coming-soon/whats-coming-next.md) — Linux runtime hardening and Windows support via crosvm.

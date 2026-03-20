@@ -1,3 +1,12 @@
+---
+title: "How We See Sandboxing Today"
+type: article
+date: 2026-03-18
+description: "A deep dive into sandboxing approaches for AI coding agents — from containers to microVMs — and why hardware-level isolation matters."
+tags: [sandboxing, isolation, security, microvm]
+author: "Nanosandbox Team"
+---
+
 # How We See Sandboxing Today
 
 *When your code is written by a machine that hallucinates, the walls around it had better be real.*
@@ -194,7 +203,7 @@ Let's be concrete about what each approach protects against:
 
 The critical column is the second one. Containers protect against simple escapes but fall apart against kernel-level attacks — the exact kind of attacks that matter when running untrusted, AI-generated code.
 
-> **Note**: Nanosandbox is production-ready on macOS today. Linux (KVM) support is in active development with the same architecture. Windows support via crosvm is planned — see our [What's Coming Next](../soon/whats-coming-next.md) post for details.
+> **Note**: Nanosandbox is production-ready on macOS today. Linux (KVM) support is in active development with the same architecture. Windows support via crosvm is planned — see our [What's Coming Next](../coming-soon/whats-coming-next.md) post for details.
 
 ---
 
@@ -203,9 +212,7 @@ The critical column is the second one. Containers protect against simple escapes
 Nanosandbox is production-ready on macOS with HVF today. Here's what's coming next:
 
 - **Linux Runtime Hardening**: The KVM runtime is functional but still in active development. Reaching production-grade parity with the macOS runtime is a top priority.
-- **Windows Support via crosvm**: We're planning Windows support using crosvm as the VMM backend. More details in our [What's Coming Next](../soon/whats-coming-next.md) post.
-- **Checkpoint/Restore**: Snapshot a running VM and restore it later. This enables pause/resume workflows, faster re-starts from known-good states, and the ability to fork a sandbox.
-- **GPU Passthrough**: AI agents increasingly need GPU access for running local models or ML workloads. Passing a GPU device into a microVM is a solved problem at the hypervisor level; we're integrating it into the SDK.
+- **Windows Support via crosvm**: We're planning Windows support using crosvm as the VMM backend. More details in our [What's Coming Next](../coming-soon/whats-coming-next.md) post.
 
 ---
 
