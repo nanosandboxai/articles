@@ -176,7 +176,7 @@ The primary use case is running AI coding agents safely within your git reposito
 
 ### The Git Repository Workflow
 
-1. **Pull**: `nanosb pull claude` downloads an OCI image containing Claude Code and its dependencies.
+1. **Pull**: `nanosb pull ghcr.io/nanosandboxai/claude` downloads an OCI image containing Claude Code and its dependencies.
 2. **Run in your repo**: `nanosb` boots a microVM from that image. The VM has its own kernel, isolated network, and a VirtioFS mount of your project directory — the agent sees your git repository as its workspace.
 3. **Branch-aware execution**: The agent works within your repository context. It can read your code, create branches, write files, execute commands, install packages — all within the sandbox boundary. Changes are written back to your host via VirtioFS, so git sees them as normal modifications.
 4. **Stream**: Output streams back to your terminal in real time.
@@ -220,8 +220,8 @@ $ nanosb doctor
   ✓ gvproxy: found
 
 # Pull the agent image
-$ nanosb pull claude
-  Pulling claude from ghcr.io/nanosandboxai/agents-registry...
+$ nanosb pull ghcr.io/nanosandboxai/claude
+  Pulling ghcr.io/nanosandboxai/claude...
   ████████████████████████████████ 100%
   ✓ Image cached locally
 
@@ -269,7 +269,7 @@ Let's be concrete about what each approach protects against:
 
 The critical column is the second one. Containers protect against simple escapes but fall apart against kernel-level attacks — the exact kind of attacks that matter when running untrusted, AI-generated code.
 
-> **Note**: Nanosandbox is production-ready on macOS today. Linux (KVM) support is in active development with the same architecture. Windows support is planned — see our [What's Coming Next](/coming-soon/whats-coming-next) post for details.
+> **Note**: Nanosandbox is production-ready on macOS today. Linux (KVM) support is in active development with the same architecture. Windows support is planned.
 
 ---
 
