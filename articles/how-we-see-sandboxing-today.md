@@ -104,55 +104,69 @@ Firecracker is a standalone process with a REST API. Kata Containers requires a 
 
 ## The Nanosandbox Architecture
 
-Nanosandbox takes a different path. It's a Rust SDK that provides VM-level isolation through **libkrun** — a microVM library from the Containers project — loaded as a dynamic library via FFI.
-
-Here's what that means in practice:
+Nanosandbox takes a different path. It's an SDK that provides VM-level isolation using **libkrun** — a lightweight microVM library from the Containers project — as the Virtual Machine Monitor.
 
 ```mermaid
 graph TD
-    A["Your Application<br/>(CLI, TUI, IDE plugin)"] --> B["Nanosandbox SDK (Rust)"]
+    A["Your Application<br/>(CLI, TUI, IDE plugin)"] --> B["Nanosandbox SDK"]
     B --> C["Image Manager<br/>(OCI pull)"]
     B --> D["Sandbox Manager<br/>(Lifecycle, exec, I/O)"]
     C --> E["Runtime Layer"]
     D --> E
-    E --> F["libkrun FFI<br/>(VMM)"]
-    E --> G["libkrunfw<br/>(Guest firmware)"]
-    F --> H["Hardware Virtualization"]
-    H --> I["KVM (Linux)"]
-    H --> J["HVF (macOS)"]
-    H --> K["crosvm (Windows) — planned"]
+    E --> F["VMM<br/>(libkrun)"]
+    F --> G["Hardware Virtualization"]
+    G --> H["KVM (Linux)"]
+    G --> I["HVF (macOS)"]
+    G --> J["Windows — planned"]
 ```
 
 ### What Makes This Different
 
-**1. It's a library, not a service.** You call `Sandbox::new()` in your Rust application. There's no daemon to manage, no REST API to configure, no cloud account to create. The VMM is loaded via `dlopen` and runs in-process (well, in a forked child process — more on that below).
+**1. It's a library, not a service.** You embed it into your application. There's no daemon to manage, no REST API to configure, no cloud account to create.
 
-**2. It runs on your machine.** Your code never leaves your hardware. On macOS, it uses Apple's Hypervisor.framework (HVF) and is production-ready today. Linux (KVM) support is in active development with the same architecture. Windows support via crosvm is planned.
+**2. It runs on your machine.** Your code never leaves your hardware. On macOS, it uses Apple's Hypervisor.framework (HVF) and is production-ready today. Linux (KVM) support is in active development with the same architecture. Windows support is planned.
 
-**3. It speaks OCI natively.** Nanosandbox pulls container images from Docker Hub, GHCR, or any OCI-compliant registry using pure Rust (the `oci-distribution` crate). No Docker daemon required. No containerd. The image layers are extracted, merged into a rootfs, and passed directly to the microVM.
+**3. It speaks OCI natively.** Nanosandbox pulls container images from Docker Hub, GHCR, or any OCI-compliant registry. No Docker daemon required. No containerd. The image layers are extracted, merged into a root filesystem, and passed directly to the microVM.
 
-**4. Each sandbox is a real VM.** Every sandbox gets its own Linux kernel (via libkrunfw guest firmware), its own virtual CPUs, its own memory, its own network stack. A kernel exploit inside sandbox A cannot affect sandbox B or the host.
+**4. Each sandbox is a real VM.** Every sandbox gets its own Linux kernel, its own virtual CPUs, its own memory, its own network stack. A kernel exploit inside sandbox A cannot affect sandbox B or the host.
 
-### How the VM Starts
+### How It Works
 
-The execution model is unusual and worth understanding. libkrun's `krun_start_enter` function **does not return on success**. It takes over the calling process entirely, transforming it into the microVM. To handle this safely, Nanosandbox spawns a child process:
-
-1. The parent process creates pipes for stdout and stderr.
-2. A child process is spawned via `posix_spawn` (using `std::process::Command`).
-3. In the child: configure the VM (CPUs, memory, rootfs, virtiofs mounts, networking), then call `krun_start_enter`. The child process *becomes* the VM.
-4. The parent captures the child's stdout/stderr via the pipes and streams it back to the caller.
-
-On macOS, there's an important subtlety: Apple's `hv_vm_create()` fails when called from a forked multi-threaded process (like a TUI with async runtime threads). Nanosandbox solves this by spawning a clean subprocess via `posix_spawn` using a hidden `internal-boot-vm` CLI subcommand, passing the VM configuration as JSON on stdin.
+When you start a sandbox, Nanosandbox spawns a dedicated child process that becomes the microVM. The parent process captures the VM's output and streams it back to the caller. Each VM boots its own guest kernel and runs in complete isolation from the host and from other sandboxes.
 
 ### Isolation in Depth
 
-**Filesystem isolation**: The guest sees an OCI-derived rootfs with VirtioFS mounts for the project workspace. Host directories are shared via `krun_add_virtiofs` — a paravirtualized filesystem that avoids the overhead of block device emulation. Sensitive host paths are masked or mounted read-only following OCI runtime spec conventions.
+```mermaid
+graph TB
+    subgraph HOST["Host Machine"]
+        T["Your Terminal / IDE"]
+        G["Git Repository"]
+        V["VirtioFS Mount"]
+    end
 
-**Network isolation**: The preferred mode uses **gvproxy** (from the `gvisor-tap-vsock` project) to create a user-mode virtual network with DHCP, DNS, and routing. The VM connects through a Unix datagram socket via `krun_add_net_unixgram`. A fallback mode called **Transparent Socket Impersonation (TSI)** proxies sockets through the host for environments where gvproxy isn't available. Network scope is configurable: `None` (no network), `Group`, `Public`, or `Any`.
+    subgraph VM["Sandbox (microVM) — hardware-isolated"]
+        K["Dedicated Guest Kernel"]
+        R["OCI Root Filesystem"]
+        A["AI Agent Process"]
+        N["Virtual Network Stack"]
+        P["Isolated Process Tree (PID 1)"]
+    end
 
-**Resource limits**: Memory, CPU (quota/period/shares), PID count (default: 256 to mitigate fork bombs), and file descriptor limits (1024) are set via the OCI runtime spec. `noNewPrivileges` is enabled by default. Linux capabilities are reduced to the minimum needed set.
+    T -- "streams output" --> VM
+    G -- "shared via VirtioFS" --> V
+    V -- "read/write workspace" --> R
 
-**Process isolation**: Every sandbox runs with a reduced capability set. No device passthrough by default. Each VM has its own PID 1, its own init process, its own process tree. There's no shared kernel, no shared `/proc`, no shared cgroup hierarchy.
+    style HOST fill:#1a1a2e,stroke:#444,color:#ccc
+    style VM fill:#0f3460,stroke:#ff6b6b,color:#ccc,stroke-width:2px
+```
+
+**Filesystem isolation**: The guest sees an OCI-derived root filesystem with VirtioFS mounts for the project workspace. VirtioFS is a paravirtualized filesystem that avoids the overhead of block device emulation. Sensitive host paths are masked or mounted read-only following OCI runtime spec conventions.
+
+**Network isolation**: The preferred mode uses a user-mode virtual network with DHCP, DNS, and routing. A fallback mode proxies sockets through the host for environments where the virtual network isn't available. Network scope is configurable: no network, group-only, public, or full access.
+
+**Resource limits**: Memory, CPU, PID count, and file descriptor limits are enforced per sandbox. Privilege escalation is blocked by default, and Linux capabilities are reduced to the minimum needed set.
+
+**Process isolation**: Every sandbox runs with a reduced capability set. Each VM has its own init process and process tree. There's no shared kernel, no shared `/proc`, no shared cgroup hierarchy.
 
 ---
 
@@ -162,21 +176,73 @@ The primary use case is running AI coding agents safely within your git reposito
 
 ### The Git Repository Workflow
 
-1. **Pull**: `nanosb pull ghcr.io/nanosandboxai/claude` downloads an OCI image containing Claude Code and its dependencies.
-2. **Run in your repo**: `nanosb run claude` boots a microVM from that image. The VM has its own kernel, isolated network, and a VirtioFS mount of your project directory — the agent sees your git repository as its workspace.
+1. **Pull**: `nanosb pull claude` downloads an OCI image containing Claude Code and its dependencies.
+2. **Run in your repo**: `nanosb` boots a microVM from that image. The VM has its own kernel, isolated network, and a VirtioFS mount of your project directory — the agent sees your git repository as its workspace.
 3. **Branch-aware execution**: The agent works within your repository context. It can read your code, create branches, write files, execute commands, install packages — all within the sandbox boundary. Changes are written back to your host via VirtioFS, so git sees them as normal modifications.
-4. **Stream**: Output streams back to your terminal via the stdout/stderr pipes from the child process.
+4. **Stream**: Output streams back to your terminal in real time.
 5. **Review and commit**: When the agent is done, you review the changes in your repository as you would any other code change — `git diff`, `git add`, `git commit`. The sandbox gave the agent freedom to execute; your git workflow gives you control over what ships.
 6. **Stop/Destroy**: The VM is killed and the sandbox is destroyed. No state leaks.
 
+### Try It
+
+Drop a `sandbox.yml` in your repository root to define your sandboxes:
+
+```yaml
+defaults:
+  cpus: 2
+  memory: 4096
+  timeout: 600
+
+sandboxes:
+  claude:
+    image: claude
+    env:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    mcp:
+      github:
+        command: npx
+        args: ["-y", "@modelcontextprotocol/server-github"]
+
+  codex:
+    image: codex
+    cpus: 4
+    env:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+```
+
+Then from your terminal:
+
+```terminal
+# Check that your machine meets the prerequisites
+$ nanosb doctor
+  ✓ libkrun: found at /opt/homebrew/lib/libkrun.dylib
+  ✓ Hypervisor.framework: available
+  ✓ gvproxy: found
+
+# Pull the agent image
+$ nanosb pull claude
+  Pulling claude from ghcr.io/nanosandboxai/agents-registry...
+  ████████████████████████████████ 100%
+  ✓ Image cached locally
+
+# Launch the TUI — auto-detects sandbox.yml
+$ nanosb
+  ✓ Loaded sandbox.yml (2 sandboxes)
+  ✓ Sandbox claude created
+  ✓ Sandbox codex created
+  Starting TUI...
+```
+
+Each command boots a real microVM. The agent runs inside it. Your code stays on your machine.
+
 ### Persistent Mode
 
-For longer sessions, Nanosandbox supports persistent sandboxes. The VM boots with an **agent-gateway** process as PID 1 — an HTTP API server that provides:
+For longer sessions, Nanosandbox supports persistent sandboxes. The VM stays running and provides:
 
-- SSH access (ephemeral key pairs, `developer` user)
+- SSH access with ephemeral key pairs
 - MCP (Model Context Protocol) integration for tool access
 - Session management with save/restore
-- Port forwarding via gvproxy's HTTP API
+- Port forwarding for development servers
 
 ### Multi-Agent TUI
 
@@ -199,11 +265,11 @@ Let's be concrete about what each approach protects against:
 | Code leaves your machine | No | No | No | **Yes** | **No** |
 | Works on macOS (native) | Yes | Via VM | No | N/A (cloud) | **Yes (HVF)** |
 | Works on Linux (native) | Yes | Yes | Yes | N/A (cloud) | In development (KVM) |
-| Works on Windows (native) | Yes | Via WSL | No | N/A (cloud) | Planned (crosvm) |
+| Works on Windows (native) | Yes | Via WSL | No | N/A (cloud) | Planned |
 
 The critical column is the second one. Containers protect against simple escapes but fall apart against kernel-level attacks — the exact kind of attacks that matter when running untrusted, AI-generated code.
 
-> **Note**: Nanosandbox is production-ready on macOS today. Linux (KVM) support is in active development with the same architecture. Windows support via crosvm is planned — see our [What's Coming Next](../coming-soon/whats-coming-next.md) post for details.
+> **Note**: Nanosandbox is production-ready on macOS today. Linux (KVM) support is in active development with the same architecture. Windows support is planned — see our [What's Coming Next](/coming-soon/whats-coming-next) post for details.
 
 ---
 
@@ -212,7 +278,7 @@ The critical column is the second one. Containers protect against simple escapes
 Nanosandbox is production-ready on macOS with HVF today. Here's what's coming next:
 
 - **Linux Runtime Hardening**: The KVM runtime is functional but still in active development. Reaching production-grade parity with the macOS runtime is a top priority.
-- **Windows Support via crosvm**: We're planning Windows support using crosvm as the VMM backend. More details in our [What's Coming Next](../coming-soon/whats-coming-next.md) post.
+- **Windows Support**: We're planning Windows support. More details in our [What's Coming Next](/coming-soon/whats-coming-next) post.
 
 ---
 
