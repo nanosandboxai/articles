@@ -21,7 +21,7 @@ That last part is the problem.
 
 A traditional CI pipeline runs a deterministic script you wrote and reviewed. An AI agent runs whatever it *thinks* you meant. It reads your entire codebase for context, decides which tools to invoke, and executes commands with the permissions you gave it. There have been documented cases of autonomous coding agents misinterpreting cleanup instructions and deleting production data, or being coerced through prompt injection into performing unintended actions.
 
-These aren't theoretical risks. The OWASP Foundation published its first-ever Top 10 for Agentic AI, with "Uncontrolled Autonomy" and "Goal & Instruction Hijacking" at the top of the list. Multiple AI coding tools have disclosed vulnerabilities where malicious repository configurations could trigger arbitrary code execution on collaborators' machines.
+These aren't theoretical risks. The OWASP Foundation published its first-ever Top 10 for Agentic Applications, listing threats like "Agent Goal Hijack" (ASI01) and "Unexpected Code Execution" (ASI05) among the most critical risks. Multiple AI coding tools have disclosed vulnerabilities where malicious repository configurations could trigger arbitrary code execution on collaborators' machines.
 
 The question is no longer *whether* to sandbox AI agents. It's *how well*.
 
@@ -291,6 +291,22 @@ Containers were designed to isolate trusted workloads from each other. They were
 MicroVMs fix this by giving each workload its own kernel, enforced by hardware virtualization. Nanosandbox makes this accessible: local-first, cross-platform, embeddable as a library, compatible with standard OCI images, and purpose-built for AI coding agents.
 
 The walls around your AI agent should be made of silicon, not software.
+
+---
+
+## Sources
+
+- [OWASP Top 10 for Agentic Applications (2026)](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/) — ASI01 Agent Goal Hijack, ASI05 Unexpected Code Execution, and the full agentic threat taxonomy.
+- [runc Container Escape Vulnerabilities (November 2025)](https://github.com/opencontainers/runc/security/advisories) — CVE-2025-31133, CVE-2025-52565, CVE-2025-52881: `/proc`-based container escapes via custom mount configurations.
+- [Dirty Pipe — CVE-2022-0847](https://dirtypipe.cm4all.com/) — Linux kernel vulnerability (5.8+) allowing arbitrary file overwrites, bypassing container isolation.
+- [Firecracker: Lightweight Virtualization for Serverless Computing](https://firecracker-microvm.github.io/) — AWS's microVM monitor written in Rust, powering Lambda and Fargate. Emulates five devices: virtio-net, virtio-block, virtio-vsock, serial console, keyboard controller.
+- [gVisor — Application Kernel for Containers](https://gvisor.dev/) — Google's user-space kernel reimplementing Linux syscalls in Go.
+- [Google Cloud Agent Sandbox on GKE](https://cloud.google.com/kubernetes-engine/docs/how-to/agent-sandbox) — gVisor-based isolation for AI agent workloads on Kubernetes.
+- [Modal Sandboxes](https://modal.com/use-cases/sandboxes) — Serverless sandbox platform using gVisor containers.
+- [E2B — Cloud Sandboxes for AI Agents](https://e2b.dev/) — Firecracker-based ephemeral sandboxes with JavaScript and Python SDKs.
+- [Daytona — Infrastructure for AI-Generated Code](https://www.daytona.io/) — OCI-compliant sandboxes with per-sandbox firewall rules and SDKs in Python, TypeScript, Ruby, and Go.
+- [Kata Containers](https://katacontainers.io/) — MicroVM-isolated containers for Kubernetes, supporting QEMU, Cloud Hypervisor, and Firecracker as backend VMMs.
+- [libkrun — containers/libkrun](https://github.com/containers/libkrun) — Lightweight microVM library from the Containers project, providing KVM (Linux) and HVF (macOS) virtualization.
 
 ---
 
