@@ -7,7 +7,7 @@ All content uses YAML frontmatter with `type: article`, `type: coming-soon`, or 
 ## Articles
 
 - [How We See Sandboxing Today](articles/how-we-see-sandboxing-today.md) — A deep dive into why containers aren't enough for autonomous AI agents, what the sandboxing landscape looks like today, and how microVM-based isolation with a dedicated kernel changes the game.
-- [Docker Just Proved Containers Aren't Enough — And We Agree](articles/docker-sbx-linux-windows-shipped.md) — Docker shipped sbx, a microVM sandbox for AI agents. Linux is hardened. Windows is live. Here's what that means and where the two approaches diverge.
+- [Linux Is Hardened. Windows Is Live. The Sandbox Runs Everywhere.](articles/docker-sbx-linux-windows-shipped.md) — Linux KVM is production-grade across major distros. Windows runs via WHPX on Windows 11. And Docker just shipped their own microVM sandbox — here's how the two compare.
 
 ## Posts
 

@@ -1,21 +1,21 @@
 ---
-title: "Docker Just Proved Containers Aren't Enough — And We Agree"
+title: "Linux Is Hardened. Windows Is Live. The Sandbox Runs Everywhere."
 type: article
 date: 2026-05-02
-description: "Docker shipped sbx — a microVM sandbox for AI agents. Linux is hardened. Windows is live. Here's what that means and where the two approaches diverge."
-tags: [sandboxing, docker, microvm, linux, windows, isolation, security]
+description: "Two rows in our roadmap just changed. Linux KVM is production-grade across major distros. Windows runs via WHPX on Windows 11. And Docker just shipped their own microVM sandbox — here's how the two compare."
+tags: [linux, windows, sandboxing, docker, microvm, isolation, security]
 author: "Nanosandbox Team"
 ---
 
-# Docker Just Proved Containers Aren't Enough — And We Agree
+# Linux Is Hardened. Windows Is Live. The Sandbox Runs Everywhere.
 
-*When Docker ships its own microVM sandbox and calls it "run agents in YOLO mode, safely", that's not a product launch. That's an admission.*
+*The two things we said were coming are here. This is what that took, what it looks like, and what it means now that Docker is playing the same game.*
 
 ---
 
 ## The Table That Changed
 
-In our [first article](/articles/how-we-see-sandboxing-today), we published a comparison table. Two rows stood out:
+In our [first article](/articles/how-we-see-sandboxing-today), we were honest about where we stood:
 
 | Platform | Status |
 |---|---|
@@ -24,25 +24,101 @@ In our [first article](/articles/how-we-see-sandboxing-today), we published a co
 
 Both rows just changed.
 
-Linux is hardened — tested across Ubuntu, Fedora, Debian, and openSUSE with a single binary that runs on any modern distro. Windows is live — WHPX-backed microVMs on Windows 11 with a one-line PowerShell installer.
+Linux is production-grade — tested across four major distributions with a single binary that runs on any modern distro. Windows is live — hardware-isolated microVMs on Windows 11 via a one-line PowerShell installer. The same `nanosb` CLI, the same OCI images, the same isolation guarantees on all three platforms.
 
-But the bigger story happened at Docker.
+Here's what it took to get there.
 
 ---
 
-## Docker Said the Quiet Part Out Loud
+## Linux: Hardened and Wide
 
-On March 31, 2026, Docker shipped `sbx` — a standalone CLI for running AI coding agents in microVM sandboxes. Not containers. Virtual machines. Each with a dedicated Linux kernel, hardware-enforced memory isolation, and a host-side proxy that controls every byte of network traffic.
+Linux support was never an architectural question. libkrun uses KVM, KVM is everywhere, and the guest kernel is the same one that runs on macOS via HVF. The work was in hardening — making sure the runtime behaves correctly not just on the developer machine you happen to own, but across the distribution landscape that production teams actually run.
 
-They called it "run agents in YOLO mode, safely."
+We tested across Ubuntu 22.04 and 24.04, Fedora 40 and 42, Debian 12, and openSUSE Leap 15.6. Each distribution has its own kernel configuration, its own glibc version, its own quirks around KVM device permissions. Some of those quirks were just quirks. Some were bugs.
 
-We've been saying the same thing for a year.
+The other piece is the binary itself. Shipping one build that works everywhere on Linux means choosing a glibc floor and sticking to it. We pin to version 2.28 using cargo-zigbuild — a Zig-based cross-compilation toolchain that lets us build for a specific glibc minimum without spinning up virtual machines or Docker containers to do it. The result is a single `nanosb` binary that runs on any Linux distribution shipping glibc ≥ 2.28, which covers every major distro released since 2018.
 
-The launch matters not because Docker built something surprising, but because of what it signals when Docker — the company that made containers synonymous with isolation — decides containers aren't the right boundary for AI agents. The threat model changed. Autonomous agents execute arbitrary code from arbitrary repositories. A shared kernel is not an acceptable wall for that workload. Docker knows this, we know this, and now the industry has an unambiguous signal.
+```bash
+curl -fsSL https://raw.githubusercontent.com/nanosandboxai/cli/main/scripts/install.sh | bash
+```
 
-`sbx` supports Claude Code, Codex, Cursor, Goose, and Gemini CLI out of the box. It runs on macOS, Windows 11, and Linux. It's experimental, free, and requires no Docker Desktop license. Under the hood, each sandbox is a LinuxKit microVM — the same class of hardware-enforced isolation that Nanosandbox uses.
+After install, `nanosb doctor` verifies the three things Linux actually needs:
 
-Here's how it's structured:
+```terminal
+$ nanosb doctor
+  ✓ libkrunfw: found at /usr/local/lib/libkrunfw.so
+  ✓ KVM: /dev/kvm accessible
+  ✓ gvproxy: found at /usr/local/bin/gvproxy
+```
+
+If KVM access is missing — usually a matter of adding your user to the `kvm` group — the output tells you exactly the command to run. If gvproxy isn't present, the install script has already placed it.
+
+The KVM backend itself is stable. `nanosb run` on Linux boots the same microVM stack as macOS, with hardware-enforced isolation from the host and from every other sandbox running concurrently.
+
+---
+
+## Windows: Live
+
+Windows required a different kind of work. On Linux and macOS, the hypervisor (KVM, HVF) is part of the operating system. libkrun talks directly to it. On Windows, hardware virtualization is exposed through WHPX — the Windows Hypervisor Platform — a user-mode API that sits on top of Hyper-V and gives applications direct access to the hypervisor without needing kernel-mode drivers.
+
+The Linux kernel itself ships as `libkrunfw.dll` — a Windows DLL containing the same kernel binary compiled from the same source tree as the Linux and macOS builds. `nanosb.exe` calls into libkrun, libkrun calls into WHPX, and a microVM starts with a dedicated Linux kernel inside it.
+
+```mermaid
+graph LR
+    A["nanosb.exe"] --> B["libkrun\n(Rust FFI)"]
+    B --> C["WHPX\n(Windows Hypervisor Platform)"]
+    C --> D["Isolated microVM\n[Guest Linux kernel]\n[OCI root filesystem]"]
+
+    style D fill:#0f3460,stroke:#ff6b6b,color:#ccc,stroke-width:2px
+```
+
+The same OCI images, the same workspace sharing via virtiofs, the same isolation boundary — running natively on Windows without WSL, without Docker Desktop, without any third-party virtualization layer.
+
+Installation is one PowerShell command:
+
+```powershell
+irm https://raw.githubusercontent.com/nanosandboxai/cli/v0.2.0-rc17/scripts/install.ps1 | iex
+```
+
+On a fresh Windows machine, Hyper-V and WHPX are typically not enabled. The installer detects this, enables both features automatically, and prompts for a reboot if needed. That reboot is a one-time requirement — Windows needs it to activate the hypervisor at the kernel level. The installer registers itself to resume automatically after login, so you don't need to re-run anything manually.
+
+After the restart, the rest completes without interaction: `nanosb.exe` downloads (statically linked — no VCRUNTIME140.dll dependency), the runtime libraries land in `%USERPROFILE%\.nanosandbox\libs\`, and PATH is updated immediately in the current session.
+
+```terminal
+> nanosb doctor
+  ✓ WHPX: Windows Hypervisor Platform available
+  ✓ libkrunfw.dll: found at C:\Users\you\.nanosandbox\libs\libkrunfw.dll
+  ✓ vsock_proxy: found
+```
+
+Windows support is experimental. The core path — boot a microVM, run an agent, stream output — works. Edge cases in networking, long-running sessions, and multi-sandbox scenarios are still being worked through.
+
+---
+
+## The Updated Landscape
+
+With Linux hardened and Windows live, the comparison table from the first article needs updating:
+
+| Approach | Isolation | Kernel | macOS | Linux | Windows | Local |
+|---|---|---|---|---|---|---|
+| **No isolation** | None | Shared | Yes | Yes | Yes | Yes |
+| **Containers** | Namespaces + cgroups | Shared | Via VM | Yes | Via WSL | Yes |
+| **gVisor** | User-space kernel | Intercepted | No | Yes | No | Yes |
+| **Firecracker / E2B** | Hardware (KVM) | Dedicated | No | Yes (cloud) | No | No |
+| **Docker sbx** | Hardware (HVF/WHP/KVM) | Dedicated | Yes | Experimental | Experimental | Yes |
+| **Nanosandbox** | Hardware (HVF/WHPX/KVM) | Dedicated | **Yes** | **Yes** | **Yes** | **Yes** |
+
+The cloud-first services run somewhere else on your behalf. Of the tools that run locally, only Docker sbx and Nanosandbox provide hardware-enforced isolation across all three platforms. Which brings us to Docker.
+
+---
+
+## Docker sbx: The Same Conviction, A Different Architecture
+
+On March 31, 2026, Docker shipped `sbx` — a standalone CLI for running AI agents in microVM sandboxes. Not containers. Virtual machines. Dedicated kernels. Hardware isolation.
+
+When Docker — the company that made containers the default unit of isolation — ships a microVM sandbox and calls it "run agents in YOLO mode, safely", that's a signal. The industry has made up its mind about what autonomous AI agents need.
+
+`sbx` supports Claude Code, Codex, Cursor, Goose, and Gemini CLI. It runs on macOS, Windows 11, and Linux. It's experimental and free. Under the hood, each sandbox is a LinuxKit microVM — the same class of hardware-enforced isolation that Nanosandbox uses, on the same hypervisors: HVF on macOS, WHP on Windows, KVM on Linux.
 
 ```mermaid
 graph TD
@@ -56,33 +132,19 @@ graph TD
     style F fill:#1a1a2e,stroke:#444,color:#ccc
 ```
 
-The VM boots a private Docker daemon inside it. The agent runs as an OCI container inside that daemon. The host-side proxy intercepts all outbound traffic, enforces network policy, and injects credentials on demand — so your API keys never enter the VM. The workspace is shared via virtiofs.
+The VM boots a private Docker daemon inside it. The agent runs as an OCI container inside that daemon. A host-side proxy intercepts all outbound traffic, enforces network policy, and injects credentials — so API keys never enter the VM.
 
-It works. And it's a thoughtful architecture for teams already living inside the Docker ecosystem.
+### The Same Foundation, Different Choices
 
----
+Both tools agree on the foundation: microVM per agent, hardware-enforced isolation, virtiofs for workspace, native hypervisors. Where they diverge is in what lives inside the VM.
 
-## The Same Foundation, Different Choices
+Docker's approach carries the entire Docker runtime into the sandbox. Every sandbox boots a full Docker daemon — containerd, dockerd, the works. Agents that need to build images or run compose have a complete Docker environment available. The experience is familiar. It's Docker, just with real walls around it.
 
-Both Docker sbx and Nanosandbox agree on the foundation: hardware-enforced isolation, virtiofs for workspace sharing, native hypervisors on each platform — Apple's Hypervisor.framework on macOS, Windows Hypervisor Platform on Windows, KVM on Linux. This isn't a coincidence. It's the only architecture that genuinely solves the threat model for autonomous AI agents.
+That familiarity has costs. The VM-plus-daemon stack pushes startup times into the half-second to one-second range. Network policy is enforced by the host proxy, but only for a fixed list of known services — GitHub, GitLab, Docker Hub, and a handful of others. Arbitrary credentials don't flow through; if the proxy doesn't know the service, the agent doesn't reach it. And `sbx login` is required on first run — a Docker OAuth flow ties the tool to an account, which is a blocker for air-gapped environments or teams that don't want their agent tooling phoning home.
 
-Where they diverge is in what lives inside the VM.
+Nanosandbox takes the opposite position. The VMM is libkrun — a Rust library that wraps KVM and HVF into a minimal API. No daemon lives inside the guest. OCI images are extracted directly into the root filesystem. The VM boots, the agent runs, the sandbox is destroyed. Sub-300ms boot times, no cloud account, no fixed service list — credentials flow in as environment variables the way you'd expect.
 
-### Docker sbx: Docker in a VM
-
-Docker's approach carries Docker's entire runtime into the sandbox. Every sandbox boots a full Docker daemon — containerd, dockerd, the works. Agents that need to build images or spin up services have a full Docker environment available. The experience is familiar. It's Docker, just with real walls around it.
-
-That familiarity has costs. The VM-plus-daemon stack pushes startup times into the half-second to one-second range. Memory was originally capped at 4GB per sandbox. Network policy is enforced by the host proxy, but only across a fixed list of known services — GitHub, GitLab, Docker Hub, and a handful of others. Arbitrary credentials don't flow through; the proxy either knows the service or the agent doesn't get network access to it.
-
-There's also a cloud dependency baked into the first step. `sbx login` runs an OAuth flow that ties the tool to a Docker account. For teams in regulated industries, air-gapped environments, or shops that simply don't want their agent tooling phoning home, this is a wall before the first sandbox starts.
-
-### Nanosandbox: Minimal isolation, library-first
-
-Nanosandbox takes the opposite position. The VMM is libkrun — a Rust library from the Containers project that wraps KVM and HVF into a minimal API. No daemon lives inside the guest. OCI images are pulled from any registry and extracted directly into the root filesystem. The VM boots, the agent runs, the sandbox is destroyed.
-
-The result is a lighter footprint: sub-300ms boot times, no cloud account, no fixed service list for credentials. Environment variables work the way you'd expect. And because libkrun is a library rather than a daemon process, it embeds directly into a CLI or an IDE plugin without adding process management overhead.
-
-The tradeoff is real. Agents that depend on Docker-native workflows — building images inside the sandbox, running compose — don't have a daemon to talk to. Nanosandbox is optimized for the execution boundary, not for replicating Docker's feature surface inside it.
+The tradeoff is real: agents that depend on Docker-native workflows inside the sandbox don't have a daemon to talk to. Nanosandbox is optimized for the execution boundary, not for replicating Docker's feature set inside it.
 
 | | Docker sbx | Nanosandbox |
 |---|---|---|
@@ -99,88 +161,17 @@ The tradeoff is real. Agents that depend on Docker-native workflows — building
 | **macOS support** | Production | Production |
 | **Open source** | No | Yes |
 
-Neither approach is wrong. They're built for different defaults. If your team lives in Docker and your agents need Docker inside the sandbox, `sbx` is the natural extension of that workflow. If you want the lightest possible isolation layer, local-first, with no cloud dependency, Nanosandbox sits on the other side of that tradeoff.
+Neither is wrong. If your team lives in Docker and your agents need the Docker runtime inside the sandbox, `sbx` is the natural fit. If you want the lightest possible isolation layer — local-first, no cloud dependency, any registry — that's the other side of the tradeoff.
 
----
-
-## Linux: Hardened and Wide
-
-Linux support moved from "functional" to production-grade. The change isn't architectural — the KVM backend was always correct. It's the kind of hardening that comes from coverage: running the full test suite across Ubuntu 22.04 and 24.04, Fedora 40 and 42, Debian 12, and openSUSE Leap 15.6. Finding the edge cases. Fixing them.
-
-One binary runs everywhere. We pin the glibc floor to version 2.28 using cargo-zigbuild, which means the same download works on any modern Linux distribution without recompilation or manual dependency management.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/nanosandboxai/cli/main/scripts/install.sh | bash
-```
-
-After install, `nanosb doctor` checks the three things Linux actually needs:
-
-```terminal
-$ nanosb doctor
-  ✓ libkrunfw: found at /usr/local/lib/libkrunfw.so
-  ✓ KVM: /dev/kvm accessible
-  ✓ gvproxy: found at /usr/local/bin/gvproxy
-```
-
-If KVM access is missing, the output tells you exactly which group to join. If gvproxy isn't present, the install script has already handled it.
-
-Docker sbx on Linux requires Ubuntu 24.04 specifically and manual KVM group setup. That distribution breadth gap matters in practice — plenty of teams still run Debian 12 or Fedora on their workstations, and "upgrade your distro to use the sandbox" is not a reasonable ask.
-
----
-
-## Windows: Live
-
-The architecture on Windows follows the same shape as macOS and Linux: libkrun wraps the platform hypervisor, a Linux kernel boots inside the VM, the agent runs in a hardware-isolated environment.
-
-On Windows, the hypervisor is WHPX — Windows Hypervisor Platform. The Linux kernel ships as `libkrunfw.dll`, a Windows DLL that embeds the kernel binary compiled from the same source as the Linux and macOS builds. `nanosb.exe` calls into libkrun, libkrun calls into WHPX, and a microVM starts.
-
-```mermaid
-graph LR
-    A["nanosb.exe"] --> B["libkrun\n(Rust FFI)"]
-    B --> C["WHPX\n(Windows Hypervisor Platform)"]
-    C --> D["Isolated microVM\n[Guest Linux kernel]\n[OCI root filesystem]"]
-
-    style D fill:#0f3460,stroke:#ff6b6b,color:#ccc,stroke-width:2px
-```
-
-Installation is one PowerShell command:
-
-```powershell
-irm https://raw.githubusercontent.com/nanosandboxai/cli/v0.2.0-rc17/scripts/install.ps1 | iex
-```
-
-The installer checks for Hyper-V and WHPX. If either is disabled — which is the case on most fresh Windows machines — it enables both automatically. These are Windows optional features that require a kernel-level activation, so on a fresh machine you'll see a restart prompt. The installer handles this gracefully: it registers itself to auto-resume after login, so you walk away from the reboot and come back to a finished installation with no manual steps.
-
-After the restart, the binary downloads (`nanosb.exe` is statically linked — no VCRUNTIME140.dll required), runtime libraries land in `%USERPROFILE%\.nanosandbox\libs\`, and PATH is updated immediately in the current session.
-
-Docker sbx on Windows shares the same hardware requirement — WHPX must be enabled — but its setup doesn't automate the Windows feature activation. The gap in setup experience is meaningful for a tool positioned at developers who just want to run an agent safely.
-
----
-
-## The Updated Landscape
-
-The table from our first article had two rows that needed updating. Here's where things stand:
-
-| Approach | Isolation | Kernel | macOS | Linux | Windows | Local |
-|---|---|---|---|---|---|---|
-| **No isolation** | None | Shared | Yes | Yes | Yes | Yes |
-| **Containers** | Namespaces + cgroups | Shared | Via VM | Yes | Via WSL | Yes |
-| **gVisor** | User-space kernel | Intercepted | No | Yes | No | Yes |
-| **Firecracker / E2B** | Hardware (KVM) | Dedicated | No | Yes (cloud) | No | No |
-| **Docker sbx** | Hardware (HVF/WHP/KVM) | Dedicated | Yes | Experimental | Experimental | Yes |
-| **Nanosandbox** | Hardware (HVF/WHPX/KVM) | Dedicated | **Yes** | **Yes** | **Yes** | **Yes** |
-
-The cloud-first services run somewhere else on your behalf. Of the local options, only Docker sbx and Nanosandbox provide hardware-enforced isolation on all three platforms. That's the field.
+What matters is that both tools exist, both are shipping, and both are built on the same conviction: containers are not enough for autonomous agents. Hardware isolation is the floor.
 
 ---
 
 ## Closing Thoughts
 
-Docker shipping `sbx` is the clearest signal yet that the industry has made up its mind. Containers isolate well-behaved microservices from each other. They were never designed to contain an autonomous agent executing arbitrary code from arbitrary repositories. The shared kernel is a known, repeatedly exploited surface, and no seccomp profile or AppArmor policy makes it the right boundary for this threat model.
+A year ago, the comparison table in our first article had two honest admissions: Linux in development, Windows planned. Both are done. The same `nanosb` CLI, the same OCI images, the same hardware-isolated microVM boundary — on macOS, Linux, and Windows.
 
-The question has shifted from *whether* to isolate with hardware to *how much* to put inside the VM. Docker's answer is: bring the whole runtime. Ours is: bring only what you need.
-
-Both `sbx` and Nanosandbox run on macOS today, Linux in hardened state, and Windows in early access. The microVM approach is no longer an architectural opinion — it's becoming the baseline.
+The fact that Docker shipped `sbx` in the same window tells the rest of the story. MicroVM isolation for AI agents is no longer an architectural opinion. It's becoming the baseline.
 
 The walls around your AI agent should be made of silicon, not software.
 
