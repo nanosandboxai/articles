@@ -103,7 +103,7 @@ Nanosandbox now encrypts every secret before it crosses the host-guest boundary.
 
 For teams, secrets can be sourced from SOPS-encrypted files (Mozilla SOPS), so credentials stay encrypted at rest in version control. Sensitive files — TLS keys, service account JSON — are intercepted from the project mount, written to tmpfs inside the VM with `0400` permissions, and removed from the workspace mount before the agent sees them.
 
-The previous approach passed environment variables in plaintext. Docker sbx takes a different path: a host-side proxy intercepts outbound traffic and injects credentials for a fixed list of known services. Nanosandbox encrypts at the source and decrypts at the destination — no proxy, no fixed service list, no plaintext on the wire.
+Docker sbx takes a different path: a host-side proxy intercepts outbound traffic and injects credentials for a fixed list of known services. Nanosandbox encrypts all environment variables at the source and decrypts at the destination — no proxy, no fixed service list, no plaintext on the wire.
 
 ---
 
