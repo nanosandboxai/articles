@@ -95,6 +95,18 @@ Windows support is experimental. The core path — boot a microVM, run an agent,
 
 ---
 
+## Security: Secrets That Never Leave the Wire in Plaintext
+
+AI agents run autonomously. They pull from private repos, call paid APIs, sign artifacts. That means credentials — API keys, tokens, TLS client certs — flow into the sandbox at session start and stay resident while the agent works. If those secrets travel in cleartext between host and guest, a compromised host process or a noisy log can leak them. If they land in `.env` files or shell exports inside the VM, a rogue agent tool can read them from disk or `/proc`.
+
+Nanosandbox now encrypts every secret before it crosses the host-guest boundary. The host generates an ephemeral X25519 ECDH keypair, derives a shared secret with the gateway's public key, and encrypts each value with AES-256-GCM. The ciphertext travels over vsock to the guest, where the gateway decrypts it using its one-shot private key — zeroed immediately after first use. Decrypted values are injected into agent processes via `execve` environment, never written to disk, never exported through a shell.
+
+For teams, secrets can be sourced from SOPS-encrypted files (Mozilla SOPS), so credentials stay encrypted at rest in version control. Sensitive files — TLS keys, service account JSON — are intercepted from the project mount, written to tmpfs inside the VM with `0400` permissions, and removed from the workspace mount before the agent sees them.
+
+The previous approach passed environment variables in plaintext. Docker sbx takes a different path: a host-side proxy intercepts outbound traffic and injects credentials for a fixed list of known services. Nanosandbox encrypts at the source and decrypts at the destination — no proxy, no fixed service list, no plaintext on the wire.
+
+---
+
 ## The Updated Landscape
 
 With Linux hardened and Windows live, the comparison table from the first article needs updating:
@@ -107,6 +119,15 @@ With Linux hardened and Windows live, the comparison table from the first articl
 | **Firecracker / E2B** | Hardware (KVM) | Dedicated | No | Yes (cloud) | No | No |
 | **Docker sbx** | Hardware (HVF/WHP/KVM) | Dedicated | Yes | Experimental | Experimental | Yes |
 | **Nanosandbox** | Hardware (HVF/WHPX/KVM) | Dedicated | **Yes** | **Yes** | **Yes** | **Yes** |
+
+| Approach | Credentials / Secrets |
+|---|---|
+| **No isolation** | Plaintext env vars |
+| **Containers** | Plaintext env vars / Docker secrets |
+| **gVisor** | Plaintext env vars |
+| **Firecracker / E2B** | Plaintext env vars |
+| **Docker sbx** | Host proxy (fixed service list) |
+| **Nanosandbox** | Encrypted pipeline (X25519 + AES-256-GCM, one-shot keys) |
 
 The cloud-first services run somewhere else on your behalf. Of the tools that run locally, only Docker sbx and Nanosandbox provide hardware-enforced isolation across all three platforms. Which brings us to Docker.
 
@@ -153,7 +174,7 @@ The tradeoff is real: agents that depend on Docker-native workflows inside the s
 | **Inside the VM** | Private Docker daemon + OCI container | OCI root filesystem only |
 | **Startup time** | ~500ms–1s | ~100–300ms |
 | **OCI images** | Via private Docker daemon | Direct extraction, any registry |
-| **Credentials** | Host proxy (fixed service list) | Environment variables |
+| **Credentials** | Host proxy (fixed service list) | Encrypted pipeline (X25519 + AES-256-GCM, one-shot keys) |
 | **Cloud account** | Required (`sbx login`) | Not required |
 | **Agent-to-agent isolation** | Hardware (VM per sandbox) | Hardware (VM per sandbox) |
 | **Linux support** | Experimental (Ubuntu 24.04+) | Hardened (Ubuntu / Fedora / Debian / openSUSE) |
