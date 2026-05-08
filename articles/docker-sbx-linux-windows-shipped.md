@@ -101,8 +101,6 @@ AI agents run autonomously. They pull from private repos, call paid APIs, sign a
 
 Nanosandbox now encrypts every secret before it crosses the host-guest boundary. The host generates an ephemeral X25519 ECDH keypair, derives a shared secret with the gateway's public key, and encrypts each value with AES-256-GCM. The ciphertext travels over vsock to the guest, where the gateway decrypts it using its one-shot private key — zeroed immediately after first use. Decrypted values are injected into agent processes via `execve` environment, never written to disk, never exported through a shell.
 
-For teams, secrets can be sourced from SOPS-encrypted files (Mozilla SOPS), so credentials stay encrypted at rest in version control. Sensitive files — TLS keys, service account JSON — are intercepted from the project mount, written to tmpfs inside the VM with `0400` permissions, and removed from the workspace mount before the agent sees them.
-
 Docker sbx takes a different path: a host-side proxy intercepts outbound traffic and injects credentials for a fixed list of known services. Nanosandbox encrypts all environment variables at the source and decrypts at the destination — no proxy, no fixed service list, no plaintext on the wire.
 
 ---
