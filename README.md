@@ -2,12 +2,19 @@
 
 Technical articles exploring sandboxing, isolation, and secure execution environments for AI coding agents.
 
-All content uses YAML frontmatter with `type: article`, `type: coming-soon`, or `type: post` for categorization.
+All content uses YAML frontmatter with `type: article`, `type: coming-soon`, or `type: post` for categorization. Coming-soon entries can include `order` for roadmap sequencing.
 
 ## Articles
 
 - [How We See Sandboxing Today](articles/how-we-see-sandboxing-today.md) — A deep dive into why containers aren't enough for autonomous AI agents, what the sandboxing landscape looks like today, and how microVM-based isolation with a dedicated kernel changes the game.
 - [Linux Is Hardened. Windows Is Live. The Sandbox Runs Everywhere.](articles/docker-sbx-linux-windows-shipped.md) — Linux KVM is production-grade across major distros. Windows runs via WHPX on Windows 11. And Docker just shipped their own microVM sandbox — here's how the two compare.
+
+## Coming Soon
+
+- [Multi-language SDKs](coming-soon/multi-language-sdks.md) — First-class SDKs for Python, TypeScript, Go, Rust, Java, and C#.
+- [Custom Deep Agent Support](coming-soon/custom-deep-agents.md) — Bring your own deep agents into the sandbox lifecycle.
+- [Code Agent Caging Tournament](coming-soon/code-agent-caging-tournament.md) — Public containment testing with controlled escape challenges.
+- [More Code Agents and Continuous Improvements](coming-soon/more-code-agents-and-improvements.md) — Expanded compatibility (Gemini CLI, Grok CLI) and ongoing quality improvements.
 
 ## Posts
 
