@@ -48,7 +48,7 @@ The other piece is the binary itself. Shipping one build across Linux means choo
 
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nanosandboxai/cli/v0.2.0/scripts/install.sh | bash
+curl -fsSL https://github.com/nanosandboxai/cli/releases/latest/download/install.sh | bash
 ```
 
 
@@ -57,9 +57,16 @@ After install, `nanosb doctor` verifies the three things Linux actually needs:
 
 ```terminal
 $ nanosb doctor
-  ✓ libkrunfw: found at /usr/local/lib/libkrunfw.so
-  ✓ KVM: /dev/kvm accessible
-  ✓ gvproxy: found at /usr/local/bin/gvproxy
+
+Checking runtime prerequisites...
+
+  [✓] libkrunfw Kernel Firmware: found (libkrunfw.so.5)
+  [✓] KVM Device: /dev/kvm accessible
+  [✓] gvproxy: available (full outbound networking)
+
+3 checks passed, 0 errors, 0 warnings
+
+Ready to run sandboxes.
 ```
 
 If KVM access is missing, the user is usually not in the `kvm` group. The output prints the exact command to fix it. If `gvproxy` is missing, the installer places it automatically.
@@ -91,7 +98,7 @@ Installation is one PowerShell command:
 
 
 ```powershell
-irm https://raw.githubusercontent.com/nanosandboxai/cli/v0.2.0/scripts/install.ps1 | iex
+irm https://github.com/nanosandboxai/cli/releases/latest/download/install.ps1 | iex
 ```
 
 
@@ -102,9 +109,21 @@ After restart, setup completes without interaction. `nanosb.exe` downloads as a 
 
 ```terminal
 > nanosb doctor
-  ✓ WHPX: Windows Hypervisor Platform available
-  ✓ libkrunfw.dll: found at C:\Users\you\.nanosandbox\libs\libkrunfw.dll
-  ✓ vsock_proxy: found
+
+Checking runtime prerequisites...
+
+  [✓] HCS Service: running (vmcompute)
+  [✓] WSL Kernel: found
+  [✓] libkrunfw.dll: found
+  [✓] busybox: found
+  [✓] vsock_proxy: found
+  [✓] fuse_mount: found
+  [✓] Disk: SSD detected
+  [✓] Memory: sufficient RAM available
+
+8 checks passed, 0 errors, 0 warnings
+
+Ready to run sandboxes.
 ```
 
 Windows support is experimental, but the day-to-day workspace path is now much closer to Linux and macOS. Files and folders that tools create, replace, and clean up during builds now behave the way most developers expect, which removes a lot of the friction around package installs and test runs.
