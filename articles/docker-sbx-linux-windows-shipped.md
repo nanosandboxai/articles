@@ -107,7 +107,9 @@ After restart, setup completes without interaction. `nanosb.exe` downloads as a 
   ✓ vsock_proxy: found
 ```
 
-Windows support is experimental. The core path works today, including microVM boot, agent execution, and output streaming. Networking edge cases, long-running sessions, and multi-sandbox behavior are still being hardened.
+Windows support is experimental, but the day-to-day workspace path is now much closer to Linux and macOS. Files and folders that tools create, replace, and clean up during builds now behave the way most developers expect, which removes a lot of the friction around package installs and test runs.
+
+There are still a few advanced file-system behaviors we are tightening. For now, those cases fall back to safe defaults, while normal development loops stay reliable. We cover those details in the docs so this article can stay focused on the bigger platform story.
 
 ---
 
@@ -204,7 +206,7 @@ The tradeoff is real. Agents that depend on Docker-native workflows inside the s
 | **Cloud account** | Required (`sbx login`) | Not required |
 | **Agent-to-agent isolation** | Hardware (VM per sandbox) | Hardware (VM per sandbox) |
 | **Linux support** | Experimental (Ubuntu 24.04+) | Hardened (Ubuntu / Fedora / Debian / openSUSE) |
-| **Windows support** | Experimental (Win 11) | Experimental (Win 11) |
+| **Windows support** | Experimental (Win 11) | Experimental (Win 11, workspace parity) |
 | **macOS support** | Production | Production |
 | **Open source** | No | Yes |
 
