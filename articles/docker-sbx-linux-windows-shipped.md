@@ -146,6 +146,17 @@ Operationally, this changes how env handling behaves:
 - Values are not exported through interactive shells by default.
 - One-shot key material is wiped after decryption.
 
+
+### Linux Runtime Hardening Beyond Secret Transport
+
+v0.2.0 also hardens the Linux guest runtime itself. Secret transport is one part of the model. We also tightened what code inside the VM can do after boot.
+
+- `/proc` is mounted with `hidepid=2`, so one process cannot inspect another process environment.
+- `noNewPrivileges` is enforced, which blocks privilege gain through setuid and setgid transitions.
+- A seccomp profile blocks 34 high-risk syscalls, including `ptrace`, `bpf`, `io_uring_*`, `userfaultfd`, and kernel or module control calls.
+- Sensitive kernel surfaces are masked or read-only, including `/proc/sys`, `/proc/kcore`, `/proc/keys`, `/sys/firmware`, and `/proc/sysrq-trigger`.
+- Kernel attack paths are reduced further by disabling module loading and `kexec` in the guest kernel configuration.
+
 Docker sbx takes a different path. A host-side proxy intercepts outbound traffic and injects credentials for a fixed list of known services. Nanosandbox encrypts env payloads at the source and decrypts them at the destination. This removes the proxy model, avoids a fixed service list, and keeps plaintext off the wire.
 
 ---
