@@ -34,15 +34,16 @@ Here's what it took to get there.
 
 Linux support was never blocked by architecture. libkrun uses KVM, and KVM is broadly available. The guest kernel also matches the one used on macOS through HVF. The hard part was runtime hardening across the distributions production teams actually run.
 
-We tested across Ubuntu 22.04 and 24.04, Fedora 40 and 42, Debian 12, and openSUSE Leap 15.6. Each distribution has its own kernel configuration, its own glibc version, its own quirks around KVM device permissions. Some of those quirks were just quirks. Some were bugs.
+We tested across Ubuntu 24.04, Debian 12, Fedora 40, Arch Linux, and openSUSE Tumbleweed. Each distribution has its own kernel configuration, its own glibc version, its own quirks around KVM device permissions. Some of those quirks were just quirks. Some were bugs. The binary itself is built against a glibc 2.28 floor, so it also runs on older long-term releases (for example Ubuntu 22.04, Debian 11) that ship glibc 2.28 or newer.
 
 
-| Distribution | Version(s) tested | Status |
+| Distribution | Version tested in CI | Status |
 |---|---|---|
-| Ubuntu | 22.04 LTS, 24.04 LTS | ✅ Stable |
-| Fedora | 40, 42 | ✅ Stable |
-| Debian | 12 | ✅ Stable |
-| openSUSE Leap | 15.6 | ✅ Stable |
+| Ubuntu | 24.04 LTS | Stable |
+| Debian | 12 | Stable |
+| Fedora | 40 | Stable |
+| Arch Linux | rolling | Stable |
+| openSUSE | Tumbleweed | Stable |
 
 The other piece is the binary itself. Shipping one build across Linux means choosing a glibc floor and holding it. We pin to version 2.28 with cargo-zigbuild. This Zig-based cross-compilation toolchain targets a specific glibc minimum without requiring build VMs or Docker containers. The result is one `nanosb` binary that runs on distributions with glibc >= 2.28. That covers major distros released since 2018.
 
@@ -98,7 +99,7 @@ Installation is one PowerShell command:
 
 
 ```powershell
-irm https://github.com/nanosandboxai/cli/releases/latest/download/install.ps1 | iex
+irm https://raw.githubusercontent.com/nanosandboxai/cli/main/scripts/install.ps1 | iex
 ```
 
 
@@ -113,6 +114,7 @@ After restart, setup completes without interaction. `nanosb.exe` downloads as a 
 Checking runtime prerequisites...
 
   [✓] HCS Service: running (vmcompute)
+  [✓] Hyper-V Access: user has Hyper-V access (admin or Hyper-V Administrators)
   [✓] WSL Kernel: found
   [✓] libkrunfw.dll: found
   [✓] busybox: found
@@ -121,7 +123,7 @@ Checking runtime prerequisites...
   [✓] Disk: SSD detected
   [✓] Memory: sufficient RAM available
 
-8 checks passed, 0 errors, 0 warnings
+9 checks passed, 0 errors, 0 warnings
 
 Ready to run sandboxes.
 ```
@@ -136,7 +138,7 @@ There are still a few advanced file-system behaviors we are tightening. For now,
 
 AI agents run autonomously. They pull from private repos, call paid APIs, and sign artifacts. So credentials such as API keys, tokens, and TLS client certificates flow into the sandbox at session start and stay resident while the agent runs. If those values travel in cleartext between host and guest, a compromised host process or noisy logging path can leak them. If they are materialized as `.env` files or broad shell exports inside the VM, a rogue tool can read them from disk or `/proc`.
 
-In v0.2.0, Nanosandbox encrypts secret values before they cross the host-guest boundary. The host generates an ephemeral X25519 ECDH keypair. It derives a shared secret with the gateway's public key and encrypts each value with AES-256-GCM. The ciphertext travels over vsock to the guest. The gateway decrypts it with a one-shot private key that is zeroed after first use.
+In v0.2.0, Nanosandbox encrypts secret values before they cross the host-guest boundary. The host generates an ephemeral X25519 ECDH keypair. It derives a shared secret with the gateway's public key, hashes it with SHA-256 to produce the AES-256-GCM key, and encrypts each value with that key. The ciphertext travels over vsock to the guest. The gateway decrypts it with a one-shot private key that is zeroed after first use.
 
 Operationally, this changes how env handling behaves:
 
@@ -220,7 +222,7 @@ Docker's approach carries the full Docker runtime into the sandbox. Every sandbo
 
 That familiarity has costs. The VM-plus-daemon stack pushes startup times into the half-second to one-second range. Network policy is enforced by a host proxy and currently targets a fixed list of known services such as GitHub, GitLab, and Docker Hub. Arbitrary credentials do not flow through when a service is outside that list. `sbx login` is also required on first run through a Docker OAuth flow. This can block air-gapped environments or teams that avoid account-bound tooling.
 
-Nanosandbox takes the opposite position. The VMM is libkrun, a Rust library that wraps KVM and HVF behind a minimal API. No daemon lives inside the guest. OCI images are extracted directly into the root filesystem. The VM boots, the agent runs, and the sandbox is destroyed. Boot time is typically below 300ms. No cloud account is required. Credentials can flow as environment variables without a fixed service list.
+Nanosandbox takes the opposite position. The VMM is libkrun, a Rust library that wraps KVM and HVF behind a minimal API. No daemon lives inside the guest. OCI images are extracted directly into the root filesystem. The VM boots, the agent runs, and the sandbox is destroyed. No cloud account is required. Credentials can flow as environment variables without a fixed service list.
 
 The tradeoff is real. Agents that depend on Docker-native workflows inside the sandbox do not have a daemon to talk to. Nanosandbox is optimized for the execution boundary, not for replicating Docker's full feature set inside it.
 
@@ -230,7 +232,6 @@ The tradeoff is real. Agents that depend on Docker-native workflows inside the s
 | **Isolation model** | microVM (LinuxKit) | microVM (libkrun) |
 | **Hypervisor** | HVF / WHP / KVM | HVF / WHPX / KVM |
 | **Inside the VM** | Private Docker daemon + OCI container | OCI root filesystem only |
-| **Startup time** | ~500ms–1s | ~100–300ms |
 | **OCI images** | Via private Docker daemon | Direct extraction, any registry |
 | **Credentials** | Host proxy (fixed service list) | Encrypted pipeline (X25519 + AES-256-GCM, one-shot keys) |
 | **Cloud account** | Required (`sbx login`) | Not required |
