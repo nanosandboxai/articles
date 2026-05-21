@@ -99,7 +99,7 @@ Installation is one PowerShell command:
 
 
 ```powershell
-irm https://raw.githubusercontent.com/nanosandboxai/cli/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/nanosandboxai/cli/v0.2.0/scripts/install.ps1 | iex
 ```
 
 
