@@ -1,7 +1,7 @@
 ---
 title: "Code Agent Caging Tournament"
 type: coming-soon
-order: 3
+order: 4
 description: "A public tournament to test whether autonomous code agents can escape controlled sandbox boundaries."
 tags: [security, tournament, red-team, containment, agents]
 author: "Nanosandbox Team"

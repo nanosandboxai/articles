@@ -1,7 +1,7 @@
 ---
 title: "Custom Deep Agent Support"
 type: coming-soon
-order: 4
+order: 5
 description: "Bring your own deep agents and run them as first-class workloads inside the Nanosandbox isolation and lifecycle model."
 tags: [agents, deep-agents, platform, sandboxing]
 author: "Nanosandbox Team"

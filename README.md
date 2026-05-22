@@ -11,10 +11,11 @@ All content uses YAML frontmatter with `type: article`, `type: coming-soon`, or 
 
 ## Coming Soon
 
+- [CLI Desktop App (Tauri Wrapper)](coming-soon/cli-desktop-tauri.md) — Terminal-first desktop wrapper around the nanosb CLI.
 - [Multi-language SDKs](coming-soon/multi-language-sdks.md) — First-class SDKs for Python, TypeScript, Go, Rust, Java, and C#.
-- [Custom Deep Agent Support](coming-soon/custom-deep-agents.md) — Bring your own deep agents into the sandbox lifecycle.
-- [Code Agent Caging Tournament](coming-soon/code-agent-caging-tournament.md) — Public containment testing with controlled escape challenges.
 - [More Code Agents and Continuous Improvements](coming-soon/more-code-agents-and-improvements.md) — Expanded compatibility (Gemini CLI, Grok CLI) and ongoing quality improvements.
+- [Code Agent Caging Tournament](coming-soon/code-agent-caging-tournament.md) — Public containment testing with controlled escape challenges.
+- [Custom Deep Agent Support](coming-soon/custom-deep-agents.md) — Bring your own deep agents into the sandbox lifecycle.
 
 ## Posts
 

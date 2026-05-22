@@ -1,7 +1,7 @@
 ---
 title: "More Code Agents and Continuous Improvements"
 type: coming-soon
-order: 2
+order: 3
 description: "Expanding agent compatibility with targets like Gemini CLI and Grok CLI, plus ongoing improvements to stability and developer experience."
 tags: [agents, gemini, grok, compatibility, ux]
 author: "Nanosandbox Team"
