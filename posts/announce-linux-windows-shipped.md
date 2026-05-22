@@ -8,25 +8,25 @@ author: "Nanosandbox Team"
 ---
 
 <!-- linkedin -->
-Two rows in our roadmap just flipped.
+New article: "Linux Is Hardened. Windows Is Live. The Sandbox Runs Everywhere."
 
-Linux is hardened. Windows is live. The same `nanosb` CLI, the same OCI images, and the same hardware-isolated microVM boundary now run natively on macOS, Linux, and Windows.
+Two rows in our roadmap just flipped. Linux is production-grade across major distros. Windows runs natively on Win 11 via WHPX. The same `nanosb` CLI, same OCI images, same hardware-isolated microVM boundary — now on macOS, Linux, and Windows.
 
-v0.2.0 also ships an encrypted secret pipeline for env workflows: X25519 ECDH + AES-256-GCM with one-shot keys. No plaintext on the wire. No `.env` files left behind in the guest.
+v0.2.0 also ships an encrypted secret pipeline for env workflows (X25519 + AES-256-GCM, one-shot keys) and a deep comparison with Docker's new `sbx`.
 
-In the same window, Docker shipped `sbx`, their own microVM sandbox for AI agents. We wrote about both — what's the same, what's different, and why microVM isolation is becoming the baseline for autonomous code execution.
+Coming next: multi-language SDKs, custom deep agent support, a public code agent caging tournament, more agents (Gemini CLI, Grok CLI), and a Tauri-powered desktop app.
 
 Read the full article: https://nanosandbox.ai/articles/docker-sbx-linux-windows-shipped
 
 #sandboxing #security #AIagents #microVM #linux #windows #nanosandbox
 
 <!-- x -->
-v0.2.0 is here.
+New article: "Linux Is Hardened. Windows Is Live."
 
-Linux: hardened across Ubuntu, Debian, Fedora, Arch, openSUSE.
-Windows: live on Win 11 via WHPX.
-Secrets: encrypted X25519 + AES-256-GCM pipeline, one-shot keys.
+Same `nanosb`, same OCI images, same microVM boundary — now on macOS, Linux, and Windows.
 
-Plus a deep comparison with Docker's new `sbx`.
+Plus encrypted env pipeline and a deep comparison with Docker's new `sbx`.
+
+Coming: SDKs, custom agents, caging tournament.
 
 https://nanosandbox.ai/articles/docker-sbx-linux-windows-shipped
